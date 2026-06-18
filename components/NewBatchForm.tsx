@@ -23,7 +23,7 @@ export default function NewBatchForm({ templates }: { templates: Template[] }) {
     const body = await res.json().catch(() => ({}));
     setBusy(false);
     if (res.ok) {
-      router.push(`/batches/${body.batch.id}`);
+      router.push(`/admin/batches/${body.batch.id}`);
       router.refresh();
     } else {
       setError(body.error ?? 'Failed to create batch');
@@ -107,15 +107,19 @@ export default function NewBatchForm({ templates }: { templates: Template[] }) {
       </div>
 
       <div>
-        <label className={labelCls}>Email body (HTML, supports {'{{name}}'} etc.)</label>
+        <label className={labelCls}>Email message (HTML, supports {'{{name}}'}, {'{{event}}'} …)</label>
         <textarea
           name="email_body"
-          rows={4}
+          rows={5}
           defaultValue={
-            'Hi {{name}},<br/><br/>Congratulations! Your certificate is attached.<br/>Verify it any time at {{verification_url}}.'
+            "Congratulations! 🎉 We're delighted to present you with your official Certificate of Completion for {{event}}.<br/><br/>Your certificate is attached to this email as a PDF. You can also verify its authenticity online at any time using the button below.<br/><br/>Thank you for your dedication and hard work throughout the program. We wish you the very best in your journey ahead."
           }
           className={inputCls}
         />
+        <p className="mt-1 text-xs text-zinc-400">
+          This is the message body only. The email automatically adds the header, a
+          “Dear {'{{name}}'},” greeting, a Verify button, and the footer.
+        </p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

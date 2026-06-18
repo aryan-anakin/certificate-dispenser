@@ -20,7 +20,7 @@ export default function LoginPage() {
     });
     setBusy(false);
     if (res.ok) {
-      router.push('/');
+      router.push('/admin');
       router.refresh();
     } else {
       const body = await res.json().catch(() => ({}));

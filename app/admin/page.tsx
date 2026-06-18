@@ -44,7 +44,7 @@ export default async function BatchesPage() {
           {batches.map((b) => (
             <li key={b.id}>
               <Link
-                href={`/batches/${b.id}`}
+                href={`/admin/batches/${b.id}`}
                 className="flex items-center justify-between px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-900"
               >
                 <div className="min-w-0">

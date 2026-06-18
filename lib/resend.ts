@@ -14,6 +14,8 @@ export interface SendCertificateEmailInput {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text fallback. Auto-derived from `html` when omitted. */
+  text?: string;
   pdf: Uint8Array;
   pdfFilename: string;
   /**
@@ -55,12 +57,15 @@ export async function sendCertificateEmail(
         to: input.to,
         subject: input.subject,
         html: input.html,
-        // Plain-text fallback derived from the HTML.
-        text: input.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        // Use the caller's plain-text version, or derive a basic one from HTML.
+        text: input.text ?? input.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
         attachments: [
           {
             filename: input.pdfFilename,
-            content: Buffer.from(input.pdf),
+            // MUST be a base64 string. The SDK does NOT encode Buffers — a raw
+            // Buffer JSON-serializes to {"type":"Buffer",...} and Resend 500s
+            // with `application_error`.
+            content: Buffer.from(input.pdf).toString('base64'),
           },
         ],
       },

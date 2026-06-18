@@ -19,6 +19,8 @@ export interface CertificateData {
   recipientName: string;
   batchName: string;
   customFields: Record<string, string>;
+  /** The certificate's public verification UUID (for the `verification_id` token). */
+  certificateId?: string;
 }
 
 function hexToRgb(hex?: string): RGB {
@@ -56,6 +58,8 @@ function valueForToken(token: string, data: CertificateData): string {
   const key = token.trim().toLowerCase();
   if (key === 'name') return data.recipientName;
   if (key === 'event' || key === 'title' || key === 'batch') return data.batchName;
+  if (key === 'verification_id' || key === 'certificate_id' || key === 'id' || key === 'uuid')
+    return data.certificateId ?? '';
 
   // Custom field: exact, then case-insensitive match.
   if (data.customFields[token] != null) return data.customFields[token];

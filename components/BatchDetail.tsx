@@ -24,6 +24,16 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
 
+  // Manually add a recipient.
+  const [adding, setAdding] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addEmail, setAddEmail] = useState('');
+
+  // Change the batch's template.
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [tplId, setTplId] = useState('');
+
   const load = useCallback(async () => {
     const res = await fetch(`/api/batches/${batchId}`, { cache: 'no-store' });
     if (res.ok) setData(await res.json());
@@ -35,6 +45,14 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  // Load templates for the "change template" picker (once).
+  useEffect(() => {
+    fetch('/api/templates', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { templates: [] }))
+      .then((b) => setTemplates(b.templates ?? []))
+      .catch(() => {});
+  }, []);
 
   // Poll ONLY while there's live work to watch (generating / sending), and pause
   // when the tab is hidden. Idle batches make no requests. Manual actions still
@@ -57,7 +75,10 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) setNotice(body.error ?? 'Action failed');
       else if (label === 'generate')
-        setNotice(`Generated ${body.generated}, failed ${body.failed}.`);
+        setNotice(
+          `Generated ${body.generated}, failed ${body.failed}` +
+            (body.durationMs ? ` in ${(body.durationMs / 1000).toFixed(1)}s.` : '.')
+        );
       await load();
     } finally {
       setBusy(null);
@@ -97,6 +118,57 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
     }
   }
 
+  async function addRecipient() {
+    if (!addName.trim() || !addEmail.trim()) {
+      setNotice('Name and email are both required.');
+      return;
+    }
+    setBusy('add');
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/batches/${batchId}/recipients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: addName.trim(), email: addEmail.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotice(body.error ?? 'Failed to add recipient');
+      } else {
+        setAddName('');
+        setAddEmail('');
+        setAdding(false);
+        setNotice('Recipient added (pending). Click “1 · Generate PDFs”, then “2 · Start sending”.');
+        await load();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveTemplate() {
+    setBusy('template');
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/batches/${batchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: tplId || null }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotice(body.error ?? 'Failed to update template');
+      } else {
+        setEditingTemplate(false);
+        if (body.templateChanged)
+          setNotice('Template updated. Click “1 · Generate PDFs” to apply it to the certificates.');
+        await load();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!data) return <p className="text-sm text-zinc-500">Loading…</p>;
 
   const { batch, certificates } = data;
@@ -111,6 +183,57 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
           <p className="mt-1 text-sm text-zinc-400">
             {batch.total_count} recipients · interval {batch.send_interval_seconds}s
           </p>
+
+          {/* Template */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+            {editingTemplate ? (
+              <>
+                <span className="text-zinc-400">Template:</span>
+                <select
+                  value={tplId}
+                  onChange={(e) => setTplId(e.target.value)}
+                  className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <option value="">Default certificate (no template)</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <button
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                  disabled={busy !== null}
+                  onClick={saveTemplate}
+                >
+                  {busy === 'template' ? 'saving…' : 'save'}
+                </button>
+                <button
+                  className="text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400"
+                  disabled={busy !== null}
+                  onClick={() => setEditingTemplate(false)}
+                >
+                  cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-zinc-400">Template:</span>
+                <span className="text-zinc-600 dark:text-zinc-300">
+                  {templates.find((t) => t.id === batch.template_id)?.name ??
+                    'Default certificate (no template)'}
+                </span>
+                <button
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                  onClick={() => {
+                    setTplId(batch.template_id ?? '');
+                    setEditingTemplate(true);
+                    setNotice(null);
+                  }}
+                >
+                  change
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <StatusBadge status={batch.status} />
       </div>
@@ -153,6 +276,57 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
 
       {/* Recipients */}
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        {/* Header: count + add */}
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+            Recipients <span className="text-zinc-400">({certificates.length})</span>
+          </span>
+          <button
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+            disabled={busy !== null}
+            onClick={() => setAdding((v) => !v)}
+          >
+            {adding ? 'Close' : '+ Add recipient'}
+          </button>
+        </div>
+
+        {adding && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
+            <input
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              placeholder="Full name"
+              className={inlineInput}
+            />
+            <input
+              value={addEmail}
+              onChange={(e) => setAddEmail(e.target.value)}
+              placeholder="Email"
+              type="email"
+              onKeyDown={(e) => e.key === 'Enter' && addRecipient()}
+              className={inlineInput}
+            />
+            <button
+              className={`${btn} bg-blue-600 text-white hover:bg-blue-700`}
+              disabled={busy !== null}
+              onClick={addRecipient}
+            >
+              {busy === 'add' ? 'Adding…' : 'Add'}
+            </button>
+            <button
+              className="px-2 py-1.5 text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400"
+              disabled={busy !== null}
+              onClick={() => {
+                setAdding(false);
+                setAddName('');
+                setAddEmail('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
         <table className="w-full text-sm">
           <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-400 dark:bg-zinc-900">
             <tr>

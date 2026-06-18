@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { verifyCertificate } from '@/lib/verify';
 
 export const dynamic = 'force-dynamic';
@@ -9,22 +10,11 @@ export const metadata: Metadata = {
   title: 'Certificate verification',
 };
 
-function linkedInAddUrl(name: string, org: string, certUrl: string, certId: string): string {
-  const p = new URLSearchParams({
-    startTask: 'CERTIFICATION_NAME',
-    name,
-    organizationName: org,
-    certUrl,
-    certId,
-  });
-  return `https://www.linkedin.com/profile/add?${p.toString()}`;
-}
-
+// This is the QR target: authenticity check only. Downloading the PDF and
+// adding to LinkedIn live on a separate page: /<uuid>/add.
 export default async function VerificationPage({ params }: PageProps<'/verification/[uuid]'>) {
   const { uuid } = await params;
   const result = await verifyCertificate(uuid);
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '');
-  const certUrl = `${appUrl}/verification/${uuid}`;
 
   return (
     <main className="flex flex-1 items-center justify-center bg-zinc-50 px-4 py-16 dark:bg-black">
@@ -47,28 +37,13 @@ export default async function VerificationPage({ params }: PageProps<'/verificat
               </p>
             )}
 
-            <div className="mt-6 flex flex-col gap-2">
-              {result.pdf_url && (
-                <a
-                  href={result.pdf_url}
-                  target="_blank"
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  Download certificate (PDF)
-                </a>
-              )}
-              <a
-                href={linkedInAddUrl(
-                  result.recipient_name ?? '',
-                  process.env.RESEND_FROM_NAME ?? 'Issuer',
-                  certUrl,
-                  uuid
-                )}
-                target="_blank"
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            <div className="mt-6">
+              <Link
+                href={`/${uuid}/add`}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400"
               >
-                Add to LinkedIn
-              </a>
+                Download &amp; add to LinkedIn →
+              </Link>
             </div>
             <p className="mt-6 break-all font-mono text-[10px] text-zinc-300 dark:text-zinc-600">
               {uuid}

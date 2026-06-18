@@ -9,6 +9,7 @@ import { getAdminClient, CERTS_BUCKET } from '@/lib/supabase';
 import { generateCertificatePdf } from '@/lib/pdf';
 import { qrPngForUuid, verificationUrl } from '@/lib/qr';
 import { sendCertificateEmail } from '@/lib/resend';
+import { renderCertificateEmail } from '@/lib/email-template';
 import type { Batch, Certificate, EmailJob, Template } from '@/types';
 
 const MAX_ATTEMPTS = 3;
@@ -45,6 +46,28 @@ export interface GenerateResult {
   generated: number;
   failed: number;
   errors: string[];
+  durationMs?: number;
+}
+
+// How many certificates to render + upload at once. Overlaps the Supabase
+// round-trips (upload + status update) and uses multiple cores for rendering.
+const GEN_CONCURRENCY = 8;
+
+/** Run `fn` over items with a bounded number of in-flight tasks. */
+async function mapPool<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) break;
+      await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
 }
 
 export async function generateBatch(batchId: string): Promise<GenerateResult> {
@@ -76,8 +99,11 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
     .returns<Certificate[]>();
 
   const result: GenerateResult = { generated: 0, failed: 0, errors: [] };
+  const startedAt = Date.now();
 
-  for (const cert of certs ?? []) {
+  // Render + upload certificates concurrently (bounded pool) instead of one at a
+  // time. Counters mutate between awaits only, so they're safe without locking.
+  await mapPool(certs ?? [], GEN_CONCURRENCY, async (cert) => {
     try {
       const qrPng = await qrPngForUuid(cert.uuid);
       const pdf = await generateCertificatePdf({
@@ -88,6 +114,7 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
           recipientName: cert.recipient_name,
           batchName: batch.name,
           customFields: cert.custom_fields ?? {},
+          certificateId: cert.uuid,
         },
       });
 
@@ -112,7 +139,12 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
       await db.from('certificates')
         .update({ status: 'failed', last_error: msg }).eq('id', cert.id);
     }
-  }
+  });
+
+  result.durationMs = Date.now() - startedAt;
+  console.log(
+    `[generate] batch ${batchId}: ${result.generated} ok, ${result.failed} failed in ${result.durationMs}ms`
+  );
 
   await db.from('batches').update({ status: 'ready' }).eq('id', batchId);
   await refreshBatchCounts(batchId);
@@ -242,10 +274,20 @@ export async function tick(): Promise<TickResult> {
   const pdf = new Uint8Array(await file.arrayBuffer());
 
   const values = certValues(cert, batch);
+  // Render the issuer's message, then wrap it in the branded email shell.
+  const { html, text } = renderCertificateEmail({
+    recipientName: cert.recipient_name,
+    orgName: process.env.RESEND_FROM_NAME || 'Certificates',
+    title: batch.name,
+    verificationUrl: verificationUrl(cert.uuid),
+    messageHtml: mergeTokens(batch.email_body, values),
+    contactEmail: process.env.RESEND_FROM_EMAIL || undefined,
+  });
   const result = await sendCertificateEmail({
     to: cert.recipient_email,
     subject: mergeTokens(batch.email_subject, values),
-    html: mergeTokens(batch.email_body, values),
+    html,
+    text,
     pdf,
     pdfFilename: `certificate-${cert.uuid}.pdf`,
     // Keyed on the job id: a backoff-retry of THIS job reuses the key (Resend

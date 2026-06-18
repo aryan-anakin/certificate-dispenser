@@ -21,13 +21,13 @@ export default async function DashboardLayout({
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3">
           <nav className="flex items-center gap-6">
-            <Link href="/" className="font-semibold text-zinc-900 dark:text-zinc-50">
+            <Link href="/admin" className="font-semibold text-zinc-900 dark:text-zinc-50">
               🎓 Certificate Dispenser
             </Link>
-            <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">
+            <Link href="/admin" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">
               Batches
             </Link>
-            <Link href="/templates" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">
+            <Link href="/admin/templates" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">
               Templates
             </Link>
           </nav>

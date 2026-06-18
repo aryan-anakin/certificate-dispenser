@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase';
 import TemplateUploadForm from '@/components/TemplateUploadForm';
+import DeleteTemplateButton from '@/components/DeleteTemplateButton';
 import type { Template } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -34,11 +35,14 @@ export default async function TemplatesPage() {
         ) : (
           <ul className="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
             {templates.map((t) => (
-              <li key={t.id} className="px-5 py-4">
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">{t.name}</p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  {t.file_type} · {t.width}×{t.height}pt · {Object.keys(t.placeholders ?? {}).length} placeholders
-                </p>
+              <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">{t.name}</p>
+                  <p className="mt-0.5 text-xs text-zinc-400">
+                    {t.file_type} · {t.width}×{t.height}pt · {Object.keys(t.placeholders ?? {}).length} placeholders
+                  </p>
+                </div>
+                <DeleteTemplateButton id={t.id} name={t.name} />
               </li>
             ))}
           </ul>

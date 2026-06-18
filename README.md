@@ -114,7 +114,7 @@ This is a working v1 prototype. Before production, see `plan.md` §6/§11 and:
 
 ```
 app/
-  (dashboard)/            gated: batches list, batch detail, templates
+  admin/                  gated dashboard (/admin): batches list, batch detail, templates
   verification/[uuid]/    PUBLIC authenticity page (QR target)
   login/                  admin password gate
   api/                    route handlers (templates, batches, certificates, verify, worker)

@@ -22,7 +22,7 @@ create table if not exists batches (
   name                  text not null,
   template_id           uuid references templates(id) on delete set null,
   email_subject         text not null default 'Your certificate',
-  email_body            text not null default 'Hi {{name}}, your certificate is attached. Verify it at {{verification_url}}.',
+  email_body            text not null default 'Congratulations! Your official Certificate of Completion for {{event}} is attached as a PDF. You can verify its authenticity any time using the button below.',
   send_interval_seconds int  not null default 30,
   status                text not null default 'draft', -- draft|generating|ready|sending|paused|completed
   total_count           int  not null default 0,
