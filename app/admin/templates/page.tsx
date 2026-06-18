@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getAdminClient } from '@/lib/supabase';
 import TemplateUploadForm from '@/components/TemplateUploadForm';
 import DeleteTemplateButton from '@/components/DeleteTemplateButton';
@@ -37,12 +38,26 @@ export default async function TemplatesPage() {
             {templates.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-4">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">{t.name}</p>
+                  <Link
+                    href={`/admin/templates/${t.id}`}
+                    className="truncate font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                  >
+                    {t.name}
+                  </Link>
                   <p className="mt-0.5 text-xs text-zinc-400">
-                    {t.file_type} · {t.width}×{t.height}pt · {Object.keys(t.placeholders ?? {}).length} placeholders
+                    {t.file_type} · {t.width}×{t.height}pt · {Object.keys(t.placeholders ?? {}).length} placeholders ·{' '}
+                    <span className="font-mono">{t.id.slice(0, 8)}</span>
                   </p>
                 </div>
-                <DeleteTemplateButton id={t.id} name={t.name} />
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/admin/templates/${t.id}`}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    edit
+                  </Link>
+                  <DeleteTemplateButton id={t.id} name={t.name} />
+                </div>
               </li>
             ))}
           </ul>

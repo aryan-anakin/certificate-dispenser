@@ -54,8 +54,11 @@ export default function NewBatchForm({ templates }: { templates: Template[] }) {
       </div>
 
       <div>
-        <label className={labelCls}>Batch name</label>
-        <input name="name" required placeholder="AWS Workshop — June 2026" className={inputCls} />
+        <label className={labelCls}>Event name</label>
+        <input name="name" required placeholder="Anakin Build-a-thon — June 2026" className={inputCls} />
+        <p className="mt-1 text-xs text-zinc-400">
+          Used as <code>{'{{event}}'}</code> in the email and certificate.
+        </p>
       </div>
 
       <div>

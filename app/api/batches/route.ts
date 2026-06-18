@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 const fieldsSchema = z.object({
-  name: z.string().min(1, 'Batch name is required'),
+  name: z.string().min(1, 'Event name is required'),
   template_id: z.string().uuid().optional().or(z.literal('')).transform((v) => v || null),
   email_subject: z.string().min(1).default('Your certificate'),
   email_body: z
