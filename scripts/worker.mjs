@@ -44,17 +44,28 @@ async function tickOnce() {
   return body.processed ?? 0;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function loop() {
+  // When started alongside the dev server (npm run dev), give the web server a
+  // moment to come up so the first ticks don't spam connection errors.
+  await sleep(Number(process.env.WORKER_START_DELAY_MS || 2000));
   console.log(`[worker] draining ${BASE}/api/worker/tick (idle poll ${IDLE_MS}ms)`);
+  let warnedDown = false;
   for (;;) {
     let processed = 0;
     try {
       processed = await tickOnce();
+      warnedDown = false;
     } catch (err) {
-      console.error('[worker] error:', err.message);
+      // Quietly tolerate "server not up yet" — only log it once.
+      if (!warnedDown) {
+        console.error(`[worker] waiting for ${BASE} … (${err.message})`);
+        warnedDown = true;
+      }
     }
     // If we just sent something, loop again immediately; else idle a bit.
-    if (processed === 0) await new Promise((r) => setTimeout(r, IDLE_MS));
+    if (processed === 0) await sleep(IDLE_MS);
   }
 }
 

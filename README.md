@@ -59,14 +59,17 @@ missing, and operations that need a service throw a clear error rather than cras
 
 ```bash
 npm install            # already done
-npm run dev            # http://localhost:3000
-npm run worker         # in a second terminal — drains the email queue
+npm run dev            # runs the app + send worker together → http://localhost:3000
 ```
 
+`npm run dev` starts **both** the Next.js app and the send worker in one terminal
+(prefixed `web` / `worker`; Ctrl+C stops both). To run them separately:
+`npm run dev:web` (app only) and `npm run worker` (worker only).
+
 The worker reads `NEXT_PUBLIC_APP_URL` + `CRON_SECRET` from `.env.local` and repeatedly
-calls `POST /api/worker/tick`. In production you can instead point a cron (Supabase
-scheduled function / Vercel Cron / any scheduler) at that endpoint with the
-`Authorization: Bearer <CRON_SECRET>` header.
+calls `POST /api/worker/tick`. In production you don't run the worker process — point a
+cron (Supabase scheduled function / Vercel Cron / any scheduler) at that endpoint with the
+`Authorization: Bearer <CRON_SECRET>` header instead.
 
 ---
 

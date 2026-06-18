@@ -170,21 +170,22 @@ real domain (e.g. `https://certs.yourcompany.com`) and regenerate certificates.
 
 ## 4. Run it
 
-Open **two terminals** in the project folder.
+One command runs both the web app **and** the send worker:
 
-Terminal 1 — the web app:
 ```bash
 npm run dev
 ```
-Visit <http://localhost:3000>. If `ADMIN_PASSWORD` is set, you'll be asked to log in.
 
-Terminal 2 — the send worker (drains the email queue):
-```bash
-npm run worker
-```
-Leave this running while you send a batch. It calls the send endpoint every few
-seconds and prints what it sends. You can stop and restart it anytime — sending
-resumes where it left off and never double-sends.
+Output is prefixed `web` and `worker`; Ctrl+C stops both. The dashboard lives at
+<http://localhost:3000/admin> (the root redirects there). If `ADMIN_PASSWORD` is
+set, you'll be asked to log in.
+
+The **worker** is what actually sends queued certificates — it calls the send
+endpoint every few seconds and prints what it sends. You can stop/restart it
+anytime; sending resumes where it left off and never double-sends.
+
+> Want them apart? `npm run dev:web` (app only) and `npm run worker` (worker only).
+> In production you don't run the worker at all — a cron pings `/api/worker/tick`.
 
 At the top of the dashboard, a yellow banner tells you if anything is still
 missing (Supabase / Resend / admin password). No banner = you're fully set up.
