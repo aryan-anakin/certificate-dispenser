@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/worker/tick?max=10",
-      "schedule": "* * * * *"
-    }
-  ]
-}

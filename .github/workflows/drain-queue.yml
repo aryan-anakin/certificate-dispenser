@@ -1,0 +1,47 @@
+name: Drain certificate send queue
+
+# Pings the worker endpoint so queued certificates send in production
+# (replacement for the standalone worker / Vercel Cron on the Hobby plan).
+#
+# GitHub schedules at most every 5 minutes and can be delayed, so each run loops
+# for ~4.5 minutes pinging the endpoint every 15s — giving near-continuous
+# draining. Free on public repos.
+#
+# Setup — Repo → Settings → Secrets and variables → Actions:
+#   - New repository SECRET:   CRON_SECRET = <your prod CRON_SECRET>
+#   - New repository VARIABLE: APP_URL     = https://certificate-dispenser.vercel.app
+#
+# Notes:
+#   - Scheduled workflows run from the DEFAULT branch only.
+#   - GitHub auto-disables schedules after 60 days of repo inactivity.
+#   - Trigger a one-off drain anytime via the Actions tab ("Run workflow").
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # every 5 min (GitHub minimum); the loop covers the gaps
+  workflow_dispatch: {}
+
+# Don't let runs pile up on top of each other.
+concurrency:
+  group: drain-queue
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drain queue for ~4.5 minutes
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing APP_URL variable or CRON_SECRET secret"; exit 1
+          fi
+          end=$((SECONDS + 270))
+          while [ "$SECONDS" -lt "$end" ]; do
+            curl -sS -X POST "$APP_URL/api/worker/tick?max=10" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -w " [HTTP %{http_code}]\n" || true
+            sleep 15
+          done
