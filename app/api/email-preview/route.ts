@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
 
   const q = request.nextUrl.searchParams;
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '');
 
   const { html } = renderCertificateEmail({
     recipientName: q.get('name') ?? 'Aryan Bramhane',
