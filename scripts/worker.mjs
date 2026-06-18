@@ -25,7 +25,7 @@ try {
   /* no .env.local — rely on the ambient environment */
 }
 
-const BASE = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const BASE = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
 const SECRET = process.env.CRON_SECRET || '';
 const IDLE_MS = Number(process.env.WORKER_POLL_MS || 3000);
 
