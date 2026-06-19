@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Certificate Dispenser",
+  title: "Anakin Certificate Dispenser",
   description: "Generate, verify, and email certificates at scale.",
 };
 
