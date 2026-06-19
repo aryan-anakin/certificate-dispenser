@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getAdminClient } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
 import NewBatchForm from '@/components/NewBatchForm';
+import DeleteBatchButton from '@/components/DeleteBatchButton';
 import type { Batch, Template } from '@/types';
 
 export const dynamic = 'force-dynamic'; // always reflect latest DB state
@@ -42,11 +43,8 @@ export default async function BatchesPage() {
       ) : (
         <ul className="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
           {batches.map((b) => (
-            <li key={b.id}>
-              <Link
-                href={`/admin/batches/${b.id}`}
-                className="flex items-center justify-between px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-900"
-              >
+            <li key={b.id} className="flex items-center gap-3 px-5 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+              <Link href={`/admin/batches/${b.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">{b.name}</p>
                   <p className="mt-0.5 text-xs text-zinc-400">
@@ -55,6 +53,7 @@ export default async function BatchesPage() {
                 </div>
                 <StatusBadge status={b.status} />
               </Link>
+              <DeleteBatchButton id={b.id} name={b.name} />
             </li>
           ))}
         </ul>

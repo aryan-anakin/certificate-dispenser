@@ -1,10 +1,12 @@
-// Standalone send worker for local dev (and sub-minute intervals).
-// Repeatedly calls POST /api/worker/tick to drain the email queue.
+// Standalone send worker. Repeatedly calls POST /api/worker/tick to drain the
+// email queue. Safe to stop/restart anytime: sending is resumable, never doubles.
 //
-//   npm run worker
+//   npm run worker                                  # target = WORKER_URL or NEXT_PUBLIC_APP_URL
+//   npm run worker -- https://your-app.vercel.app   # drain PRODUCTION from your laptop
+//   WORKER_URL=https://your-app.vercel.app npm run worker
 //
-// Reads NEXT_PUBLIC_APP_URL + CRON_SECRET from .env.local (or the environment).
-// Safe to stop/restart anytime: sending is resumable and never double-sends.
+// Target URL precedence: CLI arg > WORKER_URL > NEXT_PUBLIC_APP_URL > localhost.
+// CRON_SECRET must match the target server's CRON_SECRET (else 401).
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +27,14 @@ try {
   /* no .env.local — rely on the ambient environment */
 }
 
-const BASE = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
+// Target: a CLI arg or WORKER_URL lets you point the local worker at production
+// without changing NEXT_PUBLIC_APP_URL (which is the URL baked into certificates).
+const BASE = (
+  process.argv[2] ||
+  process.env.WORKER_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3000'
+).replace(/\/+$/, '');
 const SECRET = process.env.CRON_SECRET || '';
 const IDLE_MS = Number(process.env.WORKER_POLL_MS || 3000);
 

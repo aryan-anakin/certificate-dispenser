@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
-import { getAdminClient } from '@/lib/supabase';
+import { getAdminClient, CERTS_BUCKET } from '@/lib/supabase';
 import { refreshBatchCounts } from '@/lib/queue';
 import type { Batch, Certificate } from '@/types';
 
@@ -89,4 +89,29 @@ export async function PATCH(request: Request, ctx: RouteContext<'/api/batches/[i
   }
 
   return Response.json({ batch, templateChanged, resetCount });
+}
+
+// Delete a batch and everything under it. Certificates + email_jobs cascade via
+// the schema FKs; we also best-effort delete the generated PDFs from Storage.
+export async function DELETE(_req: Request, ctx: RouteContext<'/api/batches/[id]'>) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const { id } = await ctx.params;
+  const db = getAdminClient();
+
+  const { data: batch } = await db
+    .from('batches').select('id').eq('id', id).single<{ id: string }>();
+  if (!batch) return Response.json({ error: 'Batch not found' }, { status: 404 });
+
+  // Remove generated PDFs (stored under "<batchId>/<uuid>.pdf"). Best-effort.
+  const { data: files } = await db.storage.from(CERTS_BUCKET).list(id);
+  if (files && files.length > 0) {
+    await db.storage.from(CERTS_BUCKET).remove(files.map((f) => `${id}/${f.name}`));
+  }
+
+  const { error } = await db.from('batches').delete().eq('id', id);
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  return Response.json({ ok: true });
 }

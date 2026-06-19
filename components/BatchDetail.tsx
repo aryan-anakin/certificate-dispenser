@@ -408,22 +408,30 @@ export default function BatchDetail({ batchId }: { batchId: string }) {
                         >
                           edit
                         </button>
-                        {c.status !== 'revoked' && (
+                        {c.status !== 'revoked' ? (
+                          <>
+                            <button
+                              className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-300"
+                              disabled={busy !== null}
+                              onClick={() => action(`resend-${c.id}`, `/api/certificates/${c.id}/resend`)}
+                            >
+                              resend
+                            </button>
+                            <button
+                              className="text-xs text-red-500 hover:text-red-700"
+                              disabled={busy !== null}
+                              onClick={() => action(`revoke-${c.id}`, `/api/certificates/${c.id}/revoke`)}
+                            >
+                              revoke
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-300"
+                            className="text-xs font-medium text-green-600 hover:text-green-700"
                             disabled={busy !== null}
-                            onClick={() => action(`resend-${c.id}`, `/api/certificates/${c.id}/resend`)}
+                            onClick={() => action(`restore-${c.id}`, `/api/certificates/${c.id}/restore`)}
                           >
-                            resend
-                          </button>
-                        )}
-                        {c.status !== 'revoked' && (
-                          <button
-                            className="text-xs text-red-500 hover:text-red-700"
-                            disabled={busy !== null}
-                            onClick={() => action(`revoke-${c.id}`, `/api/certificates/${c.id}/revoke`)}
-                          >
-                            revoke
+                            restore
                           </button>
                         )}
                       </>
