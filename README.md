@@ -71,6 +71,10 @@ calls `POST /api/worker/tick`. In production you don't run the worker process â€
 cron (Supabase scheduled function / Vercel Cron / any scheduler) at that endpoint with the
 `Authorization: Bearer <CRON_SECRET>` header instead.
 
+> Deployed the app but want to drain its **live** queue from your laptop (your
+> machine as the cron)? Set `WORKER_URL` to the deployed canonical URL and run
+> `npm run worker`. Full walkthrough: [`docs/WORKER.md`](./docs/WORKER.md).
+
 ---
 
 ## 3. End-to-end flow

@@ -49,25 +49,48 @@ export interface GenerateResult {
   durationMs?: number;
 }
 
-// How many certificates to render + upload at once. Overlaps the Supabase
-// round-trips (upload + status update) and uses multiple cores for rendering.
-const GEN_CONCURRENCY = 8;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Run `fn` over items with a bounded number of in-flight tasks. */
-async function mapPool<T>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<void>
-): Promise<void> {
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) break;
-      await fn(items[i], i);
+/**
+ * Network-transport failures (undici "fetch failed", connection resets,
+ * timeouts, transient DNS) are worth retrying; API/validation errors are not.
+ */
+function isTransientNetworkError(err: unknown): boolean {
+  const e = err as {
+    name?: string; message?: string; code?: string;
+    cause?: { code?: string; message?: string };
+  };
+  const text = [e?.name, e?.message, e?.code, e?.cause?.code, e?.cause?.message]
+    .filter(Boolean).join(' ').toLowerCase();
+  return (
+    text.includes('fetch failed') ||
+    text.includes('econnreset') ||
+    text.includes('etimedout') ||
+    text.includes('eai_again') ||
+    text.includes('socket hang up') ||
+    text.includes('terminated') || // undici: peer closed the connection
+    text.includes('und_err') ||    // undici internal transport errors
+    text.includes('network') ||
+    text.includes('timeout')
+  );
+}
+
+/**
+ * Retry a network operation with exponential backoff, but only on transient
+ * errors. Re-throws immediately on permanent errors and after the last attempt.
+ */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i === attempts - 1 || !isTransientNetworkError(err)) throw err;
+      await sleep(300 * 2 ** i); // 300ms, 600ms
     }
-  });
-  await Promise.all(workers);
+  }
+  throw lastErr;
 }
 
 export async function generateBatch(batchId: string): Promise<GenerateResult> {
@@ -94,16 +117,25 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
     }
   }
 
+  // Process never-generated certs: brand-new (`pending`) AND ones whose
+  // generation previously failed (`failed` with no PDF yet). This lets a user
+  // simply click “Generate PDFs” again to recover transient failures. Send
+  // failures (`failed` but with a `pdf_path`) are deliberately excluded — those
+  // are recovered by re-sending, not by re-generating.
   const { data: certs } = await db
-    .from('certificates').select('*').eq('batch_id', batchId).eq('status', 'pending')
+    .from('certificates').select('*').eq('batch_id', batchId)
+    .or('status.eq.pending,and(status.eq.failed,pdf_path.is.null)')
     .returns<Certificate[]>();
 
   const result: GenerateResult = { generated: 0, failed: 0, errors: [] };
   const startedAt = Date.now();
 
-  // Render + upload certificates concurrently (bounded pool) instead of one at a
-  // time. Counters mutate between awaits only, so they're safe without locking.
-  await mapPool(certs ?? [], GEN_CONCURRENCY, async (cert) => {
+  // Generate strictly one certificate at a time: render it, push it to storage +
+  // DB, then move to the next. Slower than a concurrent pool for big batches, but
+  // it keeps a single connection open to Supabase (no concurrent-upload "fetch
+  // failed" storms) and commits each certificate as it goes. withRetry still
+  // covers the occasional lone transient blip.
+  for (const cert of certs ?? []) {
     try {
       const qrPng = await qrPngForUuid(cert.uuid);
       const pdf = await generateCertificatePdf({
@@ -119,17 +151,24 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
       });
 
       const path = `${batchId}/${cert.uuid}.pdf`;
-      const { error: upErr } = await db.storage
-        .from(CERTS_BUCKET)
-        .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-      if (upErr) throw new Error(upErr.message);
+      // Retry the network legs: a transient "fetch failed" / socket reset to
+      // Supabase is the main remaining failure mode now that uploads are serial.
+      await withRetry(async () => {
+        const { error: upErr } = await db.storage
+          .from(CERTS_BUCKET)
+          .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
+        if (upErr) throw upErr;
+      });
 
-      await db.from('certificates').update({
-        pdf_path: path,
-        status: 'generated',
-        issued_at: new Date().toISOString(),
-        last_error: null,
-      }).eq('id', cert.id);
+      await withRetry(async () => {
+        const { error: updErr } = await db.from('certificates').update({
+          pdf_path: path,
+          status: 'generated',
+          issued_at: new Date().toISOString(),
+          last_error: null,
+        }).eq('id', cert.id);
+        if (updErr) throw updErr;
+      });
 
       result.generated += 1;
     } catch (err) {
@@ -139,7 +178,7 @@ export async function generateBatch(batchId: string): Promise<GenerateResult> {
       await db.from('certificates')
         .update({ status: 'failed', last_error: msg }).eq('id', cert.id);
     }
-  });
+  }
 
   result.durationMs = Date.now() - startedAt;
   console.log(

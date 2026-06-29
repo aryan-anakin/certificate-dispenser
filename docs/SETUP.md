@@ -186,6 +186,9 @@ anytime; sending resumes where it left off and never double-sends.
 
 > Want them apart? `npm run dev:web` (app only) and `npm run worker` (worker only).
 > In production you don't run the worker at all — a cron pings `/api/worker/tick`.
+>
+> Deployed the app but want your **laptop** to drain its live queue (instead of a
+> hosted cron)? See [`docs/WORKER.md`](./WORKER.md).
 
 At the top of the dashboard, a yellow banner tells you if anything is still
 missing (Supabase / Resend / admin password). No banner = you're fully set up.
